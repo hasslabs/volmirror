@@ -912,7 +912,7 @@ git commit -m "feat: poll the endpoint and report volume and mute changes"
 **Files:**
 - Create: `src/VolMirror/TrayApp.cs`
 - Create: `src/VolMirror/Autostart.cs`
-- Create: `src/VolMirror/Program.cs`
+- Overwrite: `src/VolMirror/Program.cs` (the placeholder from Task 1)
 
 **Step 1: Write `src/VolMirror/Autostart.cs`**
 
