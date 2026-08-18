@@ -32,6 +32,7 @@
 **Files:**
 - Create: `VolMirror.sln`
 - Create: `src/VolMirror/VolMirror.csproj`
+- Create: `src/VolMirror/Program.cs` (placeholder, see Step 2)
 - Create: `tests/VolMirror.Tests/VolMirror.Tests.csproj`
 - Create: `.gitignore`
 
@@ -40,12 +41,18 @@
 Run from the repo root (`C:\Users\Viktors-PC\Documents\Visual Studio Code\VolMirror`):
 
 ```bash
-dotnet new sln -n VolMirror
-dotnet new classlib -o src/VolMirror -f net10.0-windows
-dotnet new xunit -o tests/VolMirror.Tests -f net10.0-windows
+dotnet new sln -n VolMirror --format sln
+dotnet new classlib -o src/VolMirror
+dotnet new xunit -o tests/VolMirror.Tests
 ```
 
 We start from `classlib` rather than `winforms` so the csproj is written explicitly in Step 2 — the WinForms template varies between SDK versions.
+
+Two SDK 10 quirks, both confirmed on this machine: the templates reject
+`-f net10.0-windows` (they offer only `net10.0`/`net8.0`/`netstandard*`), so the
+Windows TFM is set afterwards — Step 2 rewrites the app csproj wholesale anyway,
+and Step 4 covers the test csproj. And `dotnet new sln` now defaults to the
+`.slnx` format, hence `--format sln`.
 
 **Step 2: Replace `src/VolMirror/VolMirror.csproj`**
 
@@ -70,6 +77,24 @@ Delete the template's `Class1.cs`:
 
 ```bash
 rm src/VolMirror/Class1.cs
+```
+
+**`OutputType=WinExe` with no source files fails to build** (`CS5001: Program does
+not contain a static 'Main' method`), and the real entry point does not arrive
+until Task 8. So add a placeholder `src/VolMirror/Program.cs` — empty `Main`,
+shaped like the final version — to keep Step 6 honest. Task 8 overwrites it.
+
+```csharp
+namespace VolMirror;
+
+internal static class Program
+{
+    // Placeholder so WinExe builds; replaced wholesale in Task 8.
+    [STAThread]
+    private static void Main()
+    {
+    }
+}
 ```
 
 **Step 3: Create `src/VolMirror/app.manifest`**
@@ -1079,7 +1104,10 @@ public sealed class TrayApp : ApplicationContext
 }
 ```
 
-**Step 3: Write `src/VolMirror/Program.cs`**
+**Step 3: Overwrite `src/VolMirror/Program.cs`**
+
+This file already exists as the empty placeholder from Task 1. Replace it
+wholesale — do not merge into it.
 
 ```csharp
 using System.Windows.Forms;
