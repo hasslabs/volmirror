@@ -1156,6 +1156,11 @@ The unit tests cover the logic; this is where the app is actually proven. No cod
 dotnet publish src/VolMirror -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o publish
 ```
 
+**Do not add `InvariantGlobalization=true`** here to shrink the output. Task 2's
+culture test constructs `new CultureInfo("sv-SE")`, which throws
+`CultureNotFoundException` under that switch — the suite would go red at the
+finish line for a reason that looks nothing like its cause.
+
 Run `publish\VolMirror.exe`. A tray icon appears.
 
 **Step 2: Work through the checklist**

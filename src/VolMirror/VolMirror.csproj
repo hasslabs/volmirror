@@ -9,6 +9,15 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>VolMirror</AssemblyName>
     <RootNamespace>VolMirror</RootNamespace>
+
+    <!-- Every task's gate is "0 errors", so warnings would pass silently.
+         Tasks 6-7 are hand-written COM interop in a nullable-enabled project,
+         where a swallowed nullable warning becomes a NullReferenceException on
+         a device-unplug path. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!-- Mixed-DPI desktop; without this the tray menu is bitmap-scaled. -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
 
 </Project>
