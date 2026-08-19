@@ -63,4 +63,13 @@ public class PreampMapperTests
             CultureInfo.CurrentCulture = original;
         }
     }
+
+    [Fact]
+    public void NaN_IsTreatedAsSilence()
+    {
+        // Math.Clamp propagates NaN, which would emit "Preamp: NaN dB" — a line
+        // Equalizer APO cannot parse, leaving the gain at whatever it was.
+        // A failed COM read on a device-unplug path can produce this.
+        Assert.Equal("Preamp: -100.0 dB", PreampMapper.ToPreampLine(double.NaN, muted: false));
+    }
 }

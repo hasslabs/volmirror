@@ -11,7 +11,13 @@ public static class PreampMapper
 
     public static string ToPreampLine(double levelDb, bool muted)
     {
-        double gain = muted ? SilenceDb : Math.Clamp(levelDb, SilenceDb, 0.0);
+        // NaN is folded in with mute rather than clamped: Math.Clamp propagates it,
+        // and "Preamp: NaN dB" is a line Equalizer APO cannot parse. Silence is the
+        // safe reading of "we do not know what the volume is".
+        double gain = muted || double.IsNaN(levelDb)
+            ? SilenceDb
+            : Math.Clamp(levelDb, SilenceDb, 0.0);
+
         return string.Format(CultureInfo.InvariantCulture, "Preamp: {0:F1} dB", gain);
     }
 }
