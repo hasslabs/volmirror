@@ -22,19 +22,19 @@ public class SettingsTests : IDisposable
     {
         var settings = Settings.Load(_path);
 
-        Assert.Equal(Settings.DefaultDeviceId, settings.DeviceId);
+        Assert.Equal(Settings.DefaultDeviceName, settings.DeviceNameContains);
         Assert.True(File.Exists(_path));
     }
 
     [Fact]
     public void ExistingFile_IsRoundTripped()
     {
-        var written = new Settings { DeviceId = "{0.0.0.00000000}.{deadbeef}", PollIntervalMs = 100 };
+        var written = new Settings { DeviceNameContains = "Focusrite", PollIntervalMs = 100 };
         written.Save(_path);
 
         var read = Settings.Load(_path);
 
-        Assert.Equal("{0.0.0.00000000}.{deadbeef}", read.DeviceId);
+        Assert.Equal("Focusrite", read.DeviceNameContains);
         Assert.Equal(100, read.PollIntervalMs);
     }
 
@@ -46,7 +46,7 @@ public class SettingsTests : IDisposable
 
         var settings = Settings.Load(_path);
 
-        Assert.Equal(Settings.DefaultDeviceId, settings.DeviceId);
+        Assert.Equal(Settings.DefaultDeviceName, settings.DeviceNameContains);
     }
 
     [Fact]

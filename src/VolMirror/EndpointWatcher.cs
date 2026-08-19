@@ -11,7 +11,8 @@ public sealed class EndpointWatcher : IDisposable
 {
     private const uint ClsCtxInprocServer = 1;
 
-    private readonly string _deviceId;
+    private readonly string _nameContains;
+    private readonly string? _pinnedId;
     private readonly System.Windows.Forms.Timer _timer;
 
     private IAudioEndpointVolume? _endpoint;
@@ -25,9 +26,10 @@ public sealed class EndpointWatcher : IDisposable
 
     public bool IsAttached => _endpoint is not null;
 
-    public EndpointWatcher(string deviceId, int pollIntervalMs)
+    public EndpointWatcher(string nameContains, string? pinnedId, int pollIntervalMs)
     {
-        _deviceId = deviceId;
+        _nameContains = nameContains;
+        _pinnedId = pinnedId;
         _timer = new System.Windows.Forms.Timer { Interval = pollIntervalMs };
         _timer.Tick += (_, _) => Poll();
     }
@@ -44,11 +46,18 @@ public sealed class EndpointWatcher : IDisposable
     {
         try
         {
+            // Resolved every attempt, not cached: the ID changes underneath us
+            // when Windows re-enumerates the device.
+            string? deviceId = DeviceResolver.PickBestMatch(
+                DeviceResolver.ListActiveRenderEndpoints(), _nameContains, _pinnedId);
+            if (deviceId is null)
+                return;
+
             Type? comType = Type.GetTypeFromCLSID(CoreAudioGuids.MMDeviceEnumerator);
             if (comType is null || Activator.CreateInstance(comType) is not IMMDeviceEnumerator enumerator)
                 return;
 
-            if (enumerator.GetDevice(_deviceId, out IMMDevice device) != 0)
+            if (enumerator.GetDevice(deviceId, out IMMDevice device) != 0)
                 return;
 
             Guid iid = CoreAudioGuids.IAudioEndpointVolume;

@@ -4,12 +4,19 @@ namespace VolMirror;
 
 public sealed class Settings
 {
-    /// The Behringer UCA202 on this machine, measured via EndpointVolumeProbe.
-    /// Endpoint IDs are stable across reboots.
-    public const string DefaultDeviceId = "{0.0.0.00000000}.{953bc6ad-4278-495a-83c9-22367cb2a16b}";
+    /// Matched against the endpoint's friendly name, case-insensitively.
+    /// Deliberately a name and not an ID: endpoint IDs change when Windows
+    /// re-enumerates a device (installing Equalizer APO did exactly that to
+    /// the UCA202), which would strand a hard-coded ID.
+    public const string DefaultDeviceName = "USB Audio CODEC";
     public const string DefaultConfigDir = @"C:\Program Files\EqualizerAPO\config";
 
-    public string DeviceId { get; set; } = DefaultDeviceId;
+    public string DeviceNameContains { get; set; } = DefaultDeviceName;
+
+    /// Optional exact endpoint ID, for the case where two identical devices
+    /// share a name. Ignored if that endpoint is not present.
+    public string? PinnedDeviceId { get; set; }
+
     public string ConfigDir { get; set; } = DefaultConfigDir;
     public int PollIntervalMs { get; set; } = 50;
 

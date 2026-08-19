@@ -19,7 +19,7 @@ public sealed class TrayApp : ApplicationContext
     {
         _settings = settings;
         _writer = new PreampWriter(settings.VolumeFilePath);
-        _watcher = new EndpointWatcher(settings.DeviceId, settings.PollIntervalMs);
+        _watcher = new EndpointWatcher(settings.DeviceNameContains, settings.PinnedDeviceId, settings.PollIntervalMs);
 
         _pauseItem = new ToolStripMenuItem("Pause mirroring", null, (_, _) => TogglePause());
         _autostartItem = new ToolStripMenuItem("Start with Windows", null, (_, _) => ToggleAutostart())

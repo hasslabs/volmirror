@@ -16,12 +16,17 @@
 
 | Thing | Value |
 |---|---|
-| UCA202 endpoint ID | `{0.0.0.00000000}.{953bc6ad-4278-495a-83c9-22367cb2a16b}` |
+| UCA202 match key | friendly name contains `USB Audio CODEC` (IDs are NOT stable — see below) |
 | EQ APO config dir | `C:\Program Files\EqualizerAPO\config` |
 | App-owned file | `<config dir>\volume.txt` |
 | Include line in `config.txt` | `Include: volume.txt` |
 | Poll interval | 50 ms |
 | Silence / floor gain | âˆ’100 dB |
+
+**Endpoint IDs are not stable.** The plan originally hard-coded
+`{0.0.0.00000000}.{953bc6ad-...}`. Installing Equalizer APO made Windows
+re-enumerate the device as `{776b7734-...}`, and the app found nothing at all.
+Resolve by name via the registry instead; `DeviceResolver` does this.
 
 **Culture trap:** the machine runs a Swedish locale, where `double.ToString()` yields `-10,8`. Equalizer APO requires `-10.8`. Every number formatted into the config file MUST use `CultureInfo.InvariantCulture`. This has an explicit test.
 
