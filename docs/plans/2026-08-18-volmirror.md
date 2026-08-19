@@ -4,7 +4,7 @@
 
 **Goal:** A Windows tray app that mirrors the (stored but inert) Windows endpoint volume for the Behringer UCA202 onto an Equalizer APO preamp gain, restoring the native volume slider, media keys and mute over TOSLINK.
 
-**Architecture:** A polling watcher reads `IAudioEndpointVolume` on one endpoint (resolved by device ID), maps the reported dB + mute flag to a `Preamp: <dB> dB` line, and atomically writes it to a `volume.txt` that Equalizer APO `Include:`s. Pure logic (mapping, writing, config editing) is unit-tested; the COM watcher and tray UI are verified manually.
+**Architecture:** A polling watcher reads `IAudioEndpointVolume` on one endpoint (resolved by friendly name), maps the reported dB + mute flag to a `Preamp: <dB> dB` line, and atomically writes it to a `volume.txt` that Equalizer APO `Include:`s. Pure logic (mapping, writing, config editing) is unit-tested; the COM watcher and tray UI are verified manually.
 
 **Tech Stack:** C# / .NET 10 (`net10.0-windows`), WinForms `NotifyIcon` for the tray, xUnit for tests, Windows Core Audio COM interop (hand-written, already proven in the probe scripts).
 
@@ -16,7 +16,7 @@
 
 | Thing | Value |
 |---|---|
-| UCA202 match key | friendly name contains `USB Audio CODEC` (IDs are NOT stable — see below) |
+| UCA202 match key | friendly name contains `USB Audio CODEC` (IDs are NOT stable ï¿½ see below) |
 | EQ APO config dir | `C:\Program Files\EqualizerAPO\config` |
 | App-owned file | `<config dir>\volume.txt` |
 | Include line in `config.txt` | `Include: volume.txt` |
@@ -142,9 +142,15 @@ rm tests/VolMirror.Tests/UnitTest1.cs
 ```gitignore
 bin/
 obj/
+publish/
+TestResults/
 *.user
 .vs/
 ```
+
+`publish/` matters: Task 9 publishes a single-file exe into the repo root, and
+its "commit any fixes" step is exactly where a `git add -A` would put a binary
+into history.
 
 **Step 6: Verify the solution builds**
 
