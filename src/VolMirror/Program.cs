@@ -1,11 +1,17 @@
+using System.Windows.Forms;
+
 namespace VolMirror;
 
-// Placeholder entry point so the WinExe output links. Replaced by the real
-// tray-app entry point when the UI lands.
 internal static class Program
 {
     [STAThread]
     private static void Main()
     {
+        using var mutex = new Mutex(initiallyOwned: true, "VolMirror.SingleInstance", out bool isFirst);
+        if (!isFirst)
+            return;
+
+        ApplicationConfiguration.Initialize();
+        Application.Run(new TrayApp(Settings.Load(Settings.DefaultPath)));
     }
 }
