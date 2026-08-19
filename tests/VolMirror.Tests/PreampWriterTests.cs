@@ -80,4 +80,35 @@ public class PreampWriterTests : IDisposable
         Assert.True(writer.Write("Preamp: -10.0 dB"));
         Assert.Equal("Preamp: -10.0 dB", File.ReadAllText(_path).Trim());
     }
+
+    [Fact]
+    public void LockedFile_ThrowsRatherThanRetryingForever()
+    {
+        // Equalizer APO holds volume.txt while it reloads, so a collision is normal
+        // and gets retried. A permanently locked file must still give up, not hang
+        // the UI thread.
+        var writer = new PreampWriter(_path);
+        writer.Write("Preamp: -10.0 dB");
+
+        using var hold = File.Open(_path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        Assert.ThrowsAny<Exception>(() => writer.Write("Preamp: -20.0 dB"));
+    }
+
+    [Fact]
+    public void FailedWrite_IsRetriedOnTheNextCall()
+    {
+        // The cached value must not be updated on failure, or a dropped write
+        // would be silently skipped once the volume stops changing.
+        var writer = new PreampWriter(_path);
+        writer.Write("Preamp: -10.0 dB");
+
+        using (File.Open(_path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            Assert.ThrowsAny<Exception>(() => writer.Write("Preamp: -20.0 dB"));
+        }
+
+        Assert.True(writer.Write("Preamp: -20.0 dB"));
+        Assert.Equal("Preamp: -20.0 dB", File.ReadAllText(_path).Trim());
+    }
 }

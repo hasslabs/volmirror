@@ -15,6 +15,10 @@ public sealed class TrayApp : ApplicationContext
     private bool _paused;
     private VolumeReading? _latest;
 
+    private readonly System.Windows.Forms.Timer _retryTimer;
+    private int _consecutiveWriteFailures;
+    private bool _writeErrorReported;
+
     public TrayApp(Settings settings)
     {
         _settings = settings;
@@ -45,6 +49,17 @@ public sealed class TrayApp : ApplicationContext
 
         _watcher.Changed += OnVolumeChanged;
         _watcher.AvailabilityChanged += OnAvailabilityChanged;
+
+        // A write can fail while Equalizer APO holds the file. Changed only fires
+        // on movement, so without this a failure landing on the last change of a
+        // drag would strand the volume at the wrong level until it is touched again.
+        _retryTimer = new System.Windows.Forms.Timer { Interval = 500 };
+        _retryTimer.Tick += (_, _) =>
+        {
+            if (_consecutiveWriteFailures > 0 && !_paused)
+                WriteCurrent();
+        };
+        _retryTimer.Start();
 
         if (!Directory.Exists(settings.ConfigDir))
         {
@@ -77,18 +92,27 @@ public sealed class TrayApp : ApplicationContext
         try
         {
             _writer.Write(PreampMapper.ToPreampLine(reading.LevelDb, reading.Muted));
+            _consecutiveWriteFailures = 0;
+            _writeErrorReported = false;
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Transient: Equalizer APO may hold the file for an instant while reloading.
-            // The next change rewrites it.
+            // Already retried inside the writer. A collision with Equalizer APO's
+            // own reload is normal and self-corrects on the retry timer, so warn
+            // only once the failure has persisted for a couple of seconds - and
+            // only once, rather than on every poll.
+            _consecutiveWriteFailures++;
+
+            if (_consecutiveWriteFailures >= 4 && !_writeErrorReported)
+            {
+                _writeErrorReported = true;
+                _icon.ShowBalloonTip(10000, "VolMirror",
+                    $"Cannot write to {_settings.VolumeFilePath}. Check folder permissions.",
+                    ToolTipIcon.Error);
+            }
         }
-        catch (UnauthorizedAccessException)
-        {
-            _icon.ShowBalloonTip(10000, "VolMirror",
-                $"Cannot write to {_settings.VolumeFilePath}. Check folder permissions.",
-                ToolTipIcon.Error);
-        }
+
+        UpdateTooltip();
     }
 
     private void TogglePause()
@@ -125,6 +149,7 @@ public sealed class TrayApp : ApplicationContext
     private void UpdateTooltip()
     {
         string state = !_watcher.IsAttached ? "device not present"
+            : _consecutiveWriteFailures >= 4 ? "write failing"
             : _paused ? "paused"
             : _latest is { } r
                 ? (r.Muted ? "muted" : string.Format(CultureInfo.InvariantCulture, "{0:F1} dB",
@@ -145,6 +170,8 @@ public sealed class TrayApp : ApplicationContext
     {
         if (disposing)
         {
+            _retryTimer.Stop();
+            _retryTimer.Dispose();
             _watcher.Dispose();
             _icon.Dispose();
         }
