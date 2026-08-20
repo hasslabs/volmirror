@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>appicon.ico</ApplicationIcon>
     <AssemblyName>VolMirror</AssemblyName>
     <RootNamespace>VolMirror</RootNamespace>
 
@@ -19,5 +20,11 @@
     <!-- Mixed-DPI desktop; without this the tray menu is bitmap-scaled. -->
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Embedded as well as set as ApplicationIcon: the tray needs to pick the
+         16px frame explicitly, which ExtractAssociatedIcon cannot do. -->
+    <EmbeddedResource Include="appicon.ico" />
+  </ItemGroup>
 
 </Project>

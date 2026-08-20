@@ -1,3 +1,4 @@
+using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
 
@@ -19,6 +20,7 @@ public sealed class TrayApp : ApplicationContext
     private int _consecutiveWriteFailures;
     private bool _writeErrorReported;
     private bool _includeEnsured;
+    private readonly Icon _trayIcon;
 
     public TrayApp(Settings settings)
     {
@@ -40,9 +42,11 @@ public sealed class TrayApp : ApplicationContext
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Quit", null, (_, _) => Quit()));
 
+        _trayIcon = LoadTrayIcon();
+
         _icon = new NotifyIcon
         {
-            Icon = System.Drawing.SystemIcons.Application,
+            Icon = _trayIcon,
             Text = "VolMirror",
             ContextMenuStrip = menu,
             Visible = true
@@ -77,6 +81,18 @@ public sealed class TrayApp : ApplicationContext
 
         _watcher.Start();
         UpdateTooltip();
+    }
+
+    /// Picks the frame matching the current shell icon size, so the tray gets the
+    /// hand-drawn 16px art rather than a downscale of the 256px one.
+    private static Icon LoadTrayIcon()
+    {
+        using Stream? stream = typeof(TrayApp).Assembly
+            .GetManifestResourceStream("VolMirror.appicon.ico");
+
+        return stream is null
+            ? SystemIcons.Application
+            : new Icon(stream, SystemInformation.SmallIconSize);
     }
 
     /// Returns true once the Include line is known to be in place. Never throws:
@@ -221,6 +237,7 @@ public sealed class TrayApp : ApplicationContext
             _retryTimer.Dispose();
             _watcher.Dispose();
             _icon.Dispose();
+            _trayIcon.Dispose();
         }
         base.Dispose(disposing);
     }
