@@ -179,9 +179,24 @@ public sealed class TrayApp : ApplicationContext
 
     private void ToggleAutostart()
     {
-        bool enabled = !Autostart.IsEnabled;
-        Autostart.SetEnabled(enabled);
-        _autostartItem.Checked = enabled;
+        try
+        {
+            Autostart.SetEnabled(!Autostart.IsEnabled);
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException
+                                      or UnauthorizedAccessException or IOException)
+        {
+            // A policy- or EDR-locked Run key raises SecurityException from a
+            // writable open. Unhandled, it would escape into the message loop.
+            _icon.ShowBalloonTip(10000, "VolMirror",
+                "Could not change the autostart setting. The Run registry key is not writable.",
+                ToolTipIcon.Error);
+        }
+
+        // Read back rather than trusting the intended value: Windows may have the
+        // entry disabled in Task Manager's Startup tab, in which case the box must
+        // keep saying disabled.
+        _autostartItem.Checked = Autostart.IsEnabled;
     }
 
     private void OpenConfigFolder()
