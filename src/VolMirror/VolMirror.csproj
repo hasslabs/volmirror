@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>appicon.ico</ApplicationIcon>
+    <AssemblyName>VolMirror</AssemblyName>
+    <RootNamespace>VolMirror</RootNamespace>
+
+    <!-- Every task's gate is "0 errors", so warnings would pass silently.
+         Tasks 6-7 are hand-written COM interop in a nullable-enabled project,
+         where a swallowed nullable warning becomes a NullReferenceException on
+         a device-unplug path. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!-- Mixed-DPI desktop; without this the tray menu is bitmap-scaled. -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Embedded as well as set as ApplicationIcon: the tray needs to pick the
+         16px frame explicitly, which ExtractAssociatedIcon cannot do. -->
+    <EmbeddedResource Include="appicon.ico" />
+  </ItemGroup>
+
+</Project>

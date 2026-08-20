@@ -4,7 +4,7 @@
 
 **Goal:** A Windows tray app that mirrors the (stored but inert) Windows endpoint volume for the Behringer UCA202 onto an Equalizer APO preamp gain, restoring the native volume slider, media keys and mute over TOSLINK.
 
-**Architecture:** A polling watcher reads `IAudioEndpointVolume` on one endpoint (resolved by device ID), maps the reported dB + mute flag to a `Preamp: <dB> dB` line, and atomically writes it to a `volume.txt` that Equalizer APO `Include:`s. Pure logic (mapping, writing, config editing) is unit-tested; the COM watcher and tray UI are verified manually.
+**Architecture:** A polling watcher reads `IAudioEndpointVolume` on one endpoint (resolved by friendly name), maps the reported dB + mute flag to a `Preamp: <dB> dB` line, and atomically writes it to a `volume.txt` that Equalizer APO `Include:`s. Pure logic (mapping, writing, config editing) is unit-tested; the COM watcher and tray UI are verified manually.
 
 **Tech Stack:** C# / .NET 10 (`net10.0-windows`), WinForms `NotifyIcon` for the tray, xUnit for tests, Windows Core Audio COM interop (hand-written, already proven in the probe scripts).
 
@@ -16,12 +16,17 @@
 
 | Thing | Value |
 |---|---|
-| UCA202 endpoint ID | `{0.0.0.00000000}.{953bc6ad-4278-495a-83c9-22367cb2a16b}` |
+| UCA202 match key | friendly name contains `USB Audio CODEC` (IDs are NOT stable � see below) |
 | EQ APO config dir | `C:\Program Files\EqualizerAPO\config` |
 | App-owned file | `<config dir>\volume.txt` |
 | Include line in `config.txt` | `Include: volume.txt` |
 | Poll interval | 50 ms |
 | Silence / floor gain | −100 dB |
+
+**Endpoint IDs are not stable.** The plan originally hard-coded
+`{0.0.0.00000000}.{953bc6ad-...}`. Installing Equalizer APO made Windows
+re-enumerate the device as `{776b7734-...}`, and the app found nothing at all.
+Resolve by name via the registry instead; `DeviceResolver` does this.
 
 **Culture trap:** the machine runs a Swedish locale, where `double.ToString()` yields `-10,8`. Equalizer APO requires `-10.8`. Every number formatted into the config file MUST use `CultureInfo.InvariantCulture`. This has an explicit test.
 
@@ -32,6 +37,7 @@
 **Files:**
 - Create: `VolMirror.sln`
 - Create: `src/VolMirror/VolMirror.csproj`
+- Create: `src/VolMirror/Program.cs` (placeholder, see Step 2)
 - Create: `tests/VolMirror.Tests/VolMirror.Tests.csproj`
 - Create: `.gitignore`
 
@@ -40,12 +46,18 @@
 Run from the repo root (`C:\Users\Viktors-PC\Documents\Visual Studio Code\VolMirror`):
 
 ```bash
-dotnet new sln -n VolMirror
-dotnet new classlib -o src/VolMirror -f net10.0-windows
-dotnet new xunit -o tests/VolMirror.Tests -f net10.0-windows
+dotnet new sln -n VolMirror --format sln
+dotnet new classlib -o src/VolMirror
+dotnet new xunit -o tests/VolMirror.Tests
 ```
 
 We start from `classlib` rather than `winforms` so the csproj is written explicitly in Step 2 — the WinForms template varies between SDK versions.
+
+Two SDK 10 quirks, both confirmed on this machine: the templates reject
+`-f net10.0-windows` (they offer only `net10.0`/`net8.0`/`netstandard*`), so the
+Windows TFM is set afterwards — Step 2 rewrites the app csproj wholesale anyway,
+and Step 4 covers the test csproj. And `dotnet new sln` now defaults to the
+`.slnx` format, hence `--format sln`.
 
 **Step 2: Replace `src/VolMirror/VolMirror.csproj`**
 
@@ -70,6 +82,24 @@ Delete the template's `Class1.cs`:
 
 ```bash
 rm src/VolMirror/Class1.cs
+```
+
+**`OutputType=WinExe` with no source files fails to build** (`CS5001: Program does
+not contain a static 'Main' method`), and the real entry point does not arrive
+until Task 8. So add a placeholder `src/VolMirror/Program.cs` — empty `Main`,
+shaped like the final version — to keep Step 6 honest. Task 8 overwrites it.
+
+```csharp
+namespace VolMirror;
+
+internal static class Program
+{
+    // Placeholder so WinExe builds; replaced wholesale in Task 8.
+    [STAThread]
+    private static void Main()
+    {
+    }
+}
 ```
 
 **Step 3: Create `src/VolMirror/app.manifest`**
@@ -112,9 +142,15 @@ rm tests/VolMirror.Tests/UnitTest1.cs
 ```gitignore
 bin/
 obj/
+publish/
+TestResults/
 *.user
 .vs/
 ```
+
+`publish/` matters: Task 9 publishes a single-file exe into the repo root, and
+its "commit any fixes" step is exactly where a `git add -A` would put a binary
+into history.
 
 **Step 6: Verify the solution builds**
 
@@ -887,7 +923,7 @@ git commit -m "feat: poll the endpoint and report volume and mute changes"
 **Files:**
 - Create: `src/VolMirror/TrayApp.cs`
 - Create: `src/VolMirror/Autostart.cs`
-- Create: `src/VolMirror/Program.cs`
+- Overwrite: `src/VolMirror/Program.cs` (the placeholder from Task 1)
 
 **Step 1: Write `src/VolMirror/Autostart.cs`**
 
@@ -1079,7 +1115,10 @@ public sealed class TrayApp : ApplicationContext
 }
 ```
 
-**Step 3: Write `src/VolMirror/Program.cs`**
+**Step 3: Overwrite `src/VolMirror/Program.cs`**
+
+This file already exists as the empty placeholder from Task 1. Replace it
+wholesale — do not merge into it.
 
 ```csharp
 using System.Windows.Forms;
@@ -1127,6 +1166,11 @@ The unit tests cover the logic; this is where the app is actually proven. No cod
 ```bash
 dotnet publish src/VolMirror -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o publish
 ```
+
+**Do not add `InvariantGlobalization=true`** here to shrink the output. Task 2's
+culture test constructs `new CultureInfo("sv-SE")`, which throws
+`CultureNotFoundException` under that switch — the suite would go red at the
+finish line for a reason that looks nothing like its cause.
 
 Run `publish\VolMirror.exe`. A tray icon appears.
 
