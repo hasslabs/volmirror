@@ -135,7 +135,7 @@ public sealed class TrayApp : ApplicationContext
 
         try
         {
-            _writer.Write(PreampMapper.ToPreampLine(reading.LevelDb, reading.Muted));
+            _writer.Write(PreampMapper.ToPreampLine(reading.Scalar, reading.Muted, _settings.MinDb));
             _consecutiveWriteFailures = 0;
             _writeErrorReported = false;
         }
@@ -213,7 +213,7 @@ public sealed class TrayApp : ApplicationContext
             : !_watcher.IsAttached ? "device not present"
             : _latest is { } r
                 ? (r.Muted ? "muted" : string.Format(CultureInfo.InvariantCulture, "{0:F1} dB",
-                    Math.Clamp(r.LevelDb, PreampMapper.SilenceDb, 0.0)))
+                    PreampMapper.ScalarToDb(r.Scalar, _settings.MinDb)))
                 : "waiting";
 
         // NotifyIcon.Text is capped at 63 characters.

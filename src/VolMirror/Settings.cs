@@ -24,6 +24,10 @@ public sealed class Settings
     public string ConfigDir { get; set; } = DefaultConfigDir;
     public int PollIntervalMs { get; set; } = DefaultPollIntervalMs;
 
+    /// Gain at the bottom of the slider. A wider range makes each step coarser;
+    /// a narrower one limits how quiet it can go.
+    public double MinDb { get; set; } = PreampMapper.DefaultMinDb;
+
     public string VolumeFilePath => Path.Combine(ConfigDir, ApoConfig.VolumeFileName);
     public string ConfigFilePath => Path.Combine(ConfigDir, "config.txt");
 
@@ -71,6 +75,11 @@ public sealed class Settings
 
         // Timer.Interval throws below 1, which would brick startup permanently.
         PollIntervalMs = Math.Clamp(PollIntervalMs, MinPollIntervalMs, MaxPollIntervalMs);
+
+        if (double.IsNaN(MinDb) || MinDb >= 0.0)
+            MinDb = PreampMapper.DefaultMinDb;
+
+        MinDb = Math.Clamp(MinDb, PreampMapper.SilenceDb, -6.0);
     }
 
     private static Settings Save(Settings settings, string path)

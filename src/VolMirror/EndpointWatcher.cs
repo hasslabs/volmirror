@@ -3,7 +3,10 @@ using VolMirror.Interop;
 
 namespace VolMirror;
 
-public readonly record struct VolumeReading(double LevelDb, bool Muted);
+/// Scalar is the slider position, 0.0-1.0. Deliberately not the device's own dB:
+/// Windows derives that from the device's volume range, and the UCA202 declares
+/// -128 dB, which stretches the curve so the top of the slider barely moves.
+public readonly record struct VolumeReading(double Scalar, bool Muted);
 
 /// Polls one audio endpoint, resolved by device ID, and raises an event when its
 /// volume or mute state changes. Re-attaches by itself if the device goes away.
@@ -118,10 +121,10 @@ public sealed class EndpointWatcher : IDisposable
 
         try
         {
-            if (_endpoint.GetMasterVolumeLevel(out float db) != 0) { Detach(); return; }
+            if (_endpoint.GetMasterVolumeLevelScalar(out float scalar) != 0) { Detach(); return; }
             if (_endpoint.GetMute(out bool muted) != 0) { Detach(); return; }
 
-            var reading = new VolumeReading(db, muted);
+            var reading = new VolumeReading(scalar, muted);
             if (_last is { } previous && previous == reading)
                 return;
 

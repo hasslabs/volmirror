@@ -49,9 +49,27 @@ IAudioEndpointVolume ──watched by──▶ VolMirror
 The native controls keep working — slider, media keys, mute, the Windows OSD.
 There is no second control surface to learn, and no hotkeys are intercepted.
 
-The dB curve is Windows' own: `GetMasterVolumeLevel` already reports dB along
-its taper, so it is passed straight through. That is what makes it feel native
-rather than like a bolted-on gain.
+### Why not just use the dB Windows reports?
+
+Because Windows derives it from the device's own volume range, and some devices
+declare a nonsensical one. The UCA202 reports a minimum of −128 dB, which
+stretches the taper so badly that the top of the slider stops doing anything
+audible:
+
+| Slider range | dB covered | Per 2% keypress |
+|---|---|---|
+| 90–100% | 1.6 dB | 0.32 dB |
+| 50–60% | 2.7 dB | 0.54 dB |
+| 10–20% | 10.5 dB | 2.1 dB |
+
+At 0.32 dB a keypress is below the threshold of audibility, so near the top it
+takes three or four presses before anything happens — while the bottom of the
+slider is six times more sensitive.
+
+VolMirror therefore reads the slider *position* and applies its own curve,
+linear in dB. Every press is the same size: with the default −60 dB range and
+Windows' 2% step, that is 1.2 dB everywhere. Adjust with `MinDb` — a wider
+range makes each step coarser, a narrower one limits how quiet it can go.
 
 ## Install
 
@@ -81,6 +99,7 @@ would delete the executable Windows starts.
 | `PinnedDeviceId` | `null` | Exact endpoint ID, for two identically named devices. Ignored when that endpoint is absent |
 | `ConfigDir` | `C:\Program Files\EqualizerAPO\config` | |
 | `PollIntervalMs` | `50` | Clamped to 10–5000 |
+| `MinDb` | `-60` | Gain at the bottom of the slider. Clamped to −100…−6 |
 
 Matching is by **name**, not ID, because endpoint IDs are not stable — installing
 Equalizer APO made Windows re-enumerate the device and issue it a fresh GUID,
