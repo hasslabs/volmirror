@@ -18,9 +18,10 @@ you adjusting volume by editing a config file or learning a second set of
 hotkeys. Replacing the DAC costs money and, counter-intuitively, can make it
 worse — see below.
 
-VolMirror is about 500 lines and a config file. Your existing volume slider,
-media keys, mute and on-screen display start working again, and there is
-nothing new to learn.
+VolMirror is a small tray app — around a thousand lines, a quarter of that
+comments and COM interface declarations. Your existing volume slider, media
+keys, mute and on-screen display start working again, and there is nothing new
+to learn.
 
 ## The problem
 
