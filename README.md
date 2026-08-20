@@ -2,6 +2,26 @@
 
 Makes the Windows volume control work again for USB DACs that quietly ignore it.
 
+## Is this your problem?
+
+- The volume slider and media keys do nothing, but Spotify's own volume works
+- The slider is stuck at 100%, or greyed out entirely
+- You can only change volume per application, never globally
+- You are on a USB DAC, often over optical/S/PDIF
+
+If so, the usual advice is unhelpful: there is no registry fix (Microsoft have
+confirmed as much), a different driver cannot help because the behaviour comes
+from the device's own USB descriptor, and the remaining options all cost
+something. Routing through VoiceMeeter adds 10–20 ms of latency, a permanent
+CPU load and an extra resampling stage. Equalizer APO alone works, but leaves
+you adjusting volume by editing a config file or learning a second set of
+hotkeys. Replacing the DAC costs money and, counter-intuitively, can make it
+worse — see below.
+
+VolMirror is about 500 lines and a config file. Your existing volume slider,
+media keys, mute and on-screen display start working again, and there is
+nothing new to learn.
+
 ## The problem
 
 Some USB DACs declare a volume control they do not actually apply to the output
@@ -121,6 +141,9 @@ mangled.
   cost.
 - A hard kill (not Quit, not logout) leaves the last gain in `volume.txt`. It
   self-corrects on next launch, which re-mirrors the current volume.
+- Nothing here beats attenuating downstream in analog — a speaker's own knob or
+  remote costs no resolution and is immune to the exclusive-mode gap. This is
+  the fix for when you want the *PC's* controls to work.
 
 ## Build
 
