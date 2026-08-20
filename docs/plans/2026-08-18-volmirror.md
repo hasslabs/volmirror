@@ -43,7 +43,7 @@ Resolve by name via the registry instead; `DeviceResolver` does this.
 
 **Step 1: Create the solution and projects**
 
-Run from the repo root (`C:\Users\Viktors-PC\Documents\Visual Studio Code\VolMirror`):
+Run from the repo root:
 
 ```bash
 dotnet new sln -n VolMirror --format sln
