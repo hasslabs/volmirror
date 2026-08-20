@@ -45,6 +45,12 @@ public sealed class PreampWriter
                 // On Windows a locked destination surfaces from File.Move as
                 // UnauthorizedAccessException rather than a sharing violation, so
                 // this must not be read as a permissions problem.
+                //
+                // The temp file has to go either way: it sits in the directory
+                // Equalizer APO watches, so leaving it there makes APO reload,
+                // which re-locks the destination, which fails the next attempt.
+                ApoConfig.TryDelete(_path + ".tmp");
+
                 if (attempt >= MaxAttempts)
                     throw;
 

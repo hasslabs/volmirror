@@ -17,6 +17,7 @@ public sealed class EndpointWatcher : IDisposable
 
     private IAudioEndpointVolume? _endpoint;
     private VolumeReading? _last;
+    private int _ticksUntilRetry;
 
     /// Raised on every observed change, and once on first successful attach.
     public event Action<VolumeReading>? Changed;
@@ -68,24 +69,50 @@ public sealed class EndpointWatcher : IDisposable
             _last = null;                       // force a Changed on the next poll
             AvailabilityChanged?.Invoke(true);
         }
-        catch (COMException)
+        catch (Exception ex) when (IsTransient(ex))
         {
             _endpoint = null;
         }
     }
 
+    /// Everything the attach/read path can realistically throw. Deliberately wider
+    /// than COMException: unplugging the device makes Windows delete the registry
+    /// key mid-read, which raises IOException, and a failed QueryInterface raises
+    /// InvalidCastException. Either one escaping into Timer.Tick would stack
+    /// exception dialogs 20 times a second, since the app installs no
+    /// ThreadException handler.
+    private static bool IsTransient(Exception ex) =>
+        ex is COMException or InvalidCastException or IOException
+           or UnauthorizedAccessException or ArgumentException or NullReferenceException;
+
     private void Detach()
     {
+        if (_endpoint is not null)
+            Release(_endpoint);
+
         _endpoint = null;
         _last = null;
         AvailabilityChanged?.Invoke(false);
+    }
+
+    internal static void Release(object comObject)
+    {
+        try { Marshal.ReleaseComObject(comObject); }
+        catch (ArgumentException) { /* not an RCW, or already released */ }
     }
 
     private void Poll()
     {
         if (_endpoint is null)
         {
-            TryAttach();
+            // Re-enumerating every 50 ms while the device is off would run ~576k
+            // full device scans over a night. Once a second is plenty.
+            if (_ticksUntilRetry-- > 0)
+                return;
+
+            _ticksUntilRetry = Math.Max(1, 1000 / Math.Max(1, _timer.Interval));
+            try { TryAttach(); }
+            catch (Exception ex) when (IsTransient(ex)) { _endpoint = null; }
             return;
         }
 
@@ -101,7 +128,7 @@ public sealed class EndpointWatcher : IDisposable
             _last = reading;
             Changed?.Invoke(reading);
         }
-        catch (COMException)
+        catch (Exception ex) when (IsTransient(ex))
         {
             // Device unplugged or driver reloaded mid-poll.
             Detach();
@@ -112,7 +139,9 @@ public sealed class EndpointWatcher : IDisposable
     {
         _timer.Stop();
         _timer.Dispose();
+
         if (_endpoint is not null)
-            Marshal.ReleaseComObject(_endpoint);
+            Release(_endpoint);
+        _endpoint = null;
     }
 }

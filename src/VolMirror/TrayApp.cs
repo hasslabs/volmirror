@@ -18,6 +18,7 @@ public sealed class TrayApp : ApplicationContext
     private readonly System.Windows.Forms.Timer _retryTimer;
     private int _consecutiveWriteFailures;
     private bool _writeErrorReported;
+    private bool _includeEnsured;
 
     public TrayApp(Settings settings)
     {
@@ -56,23 +57,50 @@ public sealed class TrayApp : ApplicationContext
         _retryTimer = new System.Windows.Forms.Timer { Interval = 500 };
         _retryTimer.Tick += (_, _) =>
         {
-            if (_consecutiveWriteFailures > 0 && !_paused)
+            // Also covers installing Equalizer APO while VolMirror is already
+            // running: without this the Include line would never be written and
+            // mirroring would stay inert for the life of the process.
+            if (!_includeEnsured && TryEnsureInclude())
+                _writer.Invalidate();
+
+            if ((_consecutiveWriteFailures > 0 || !_includeEnsured) && !_paused)
                 WriteCurrent();
         };
         _retryTimer.Start();
 
-        if (!Directory.Exists(settings.ConfigDir))
-        {
-            // Keep running and re-check; the user may install Equalizer APO later.
-            _icon.ShowBalloonTip(10000, "VolMirror",
-                "Equalizer APO config folder not found. Mirroring is idle.", ToolTipIcon.Warning);
-        }
-        else
-        {
-            ApoConfig.EnsureInclude(settings.ConfigFilePath);
-        }
+        // Covers logout and shutdown, which never reach the Quit menu item. A hard
+        // kill still cannot be caught - that case self-heals on next launch, since
+        // startup re-mirrors the current volume.
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => RestoreUnityGain();
+
+        TryEnsureInclude();
 
         _watcher.Start();
+        UpdateTooltip();
+    }
+
+    /// Returns true once the Include line is known to be in place. Never throws:
+    /// this writes into %ProgramFiles% from the constructor, and an escaping
+    /// exception would kill the process before Application.Run - leaving a ghost
+    /// tray icon and no message, since WinForms' handler needs a message loop.
+    private bool TryEnsureInclude()
+    {
+        if (_includeEnsured)
+            return true;
+
+        if (!Directory.Exists(_settings.ConfigDir))
+            return false;
+
+        try
+        {
+            ApoConfig.EnsureInclude(_settings.ConfigFilePath);
+            _includeEnsured = true;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     private void OnVolumeChanged(VolumeReading reading)
@@ -148,9 +176,10 @@ public sealed class TrayApp : ApplicationContext
 
     private void UpdateTooltip()
     {
-        string state = !_watcher.IsAttached ? "device not present"
-            : _consecutiveWriteFailures >= 4 ? "write failing"
+        string state = _consecutiveWriteFailures >= 4 ? "write failing"
+            : !_includeEnsured ? "waiting for Equalizer APO"
             : _paused ? "paused"
+            : !_watcher.IsAttached ? "device not present"
             : _latest is { } r
                 ? (r.Muted ? "muted" : string.Format(CultureInfo.InvariantCulture, "{0:F1} dB",
                     Math.Clamp(r.LevelDb, PreampMapper.SilenceDb, 0.0)))
@@ -162,8 +191,26 @@ public sealed class TrayApp : ApplicationContext
 
     private void Quit()
     {
+        RestoreUnityGain();
         _icon.Visible = false;
         ExitThread();
+    }
+
+    /// Hands the volume back before leaving. The last written gain stays in effect
+    /// otherwise - the Include line is still live and the UCA202's own volume is
+    /// inert, which is the whole premise of this app - so quitting while muted
+    /// would leave the audio silent with no visible cause and no way back.
+    private void RestoreUnityGain()
+    {
+        try
+        {
+            _writer.Invalidate();
+            _writer.Write(PreampMapper.ToPreampLine(0.0, muted: false));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Nothing useful left to do on the way out.
+        }
     }
 
     protected override void Dispose(bool disposing)

@@ -62,12 +62,23 @@ public static class DeviceResolver
         {
             if (collection.Item(i, out IMMDevice device) != 0)
                 continue;
-            if (device.GetId(out string id) != 0)
-                continue;
 
-            result.Add(new AudioEndpointInfo(id, ReadNameFromRegistry(id)));
+            try
+            {
+                if (device.GetId(out string id) == 0)
+                    result.Add(new AudioEndpointInfo(id, ReadNameFromRegistry(id)));
+            }
+            finally
+            {
+                // This runs on every attach attempt while the device is missing;
+                // abandoning the RCWs to the finalizer would keep a supposedly
+                // idle process churning.
+                EndpointWatcher.Release(device);
+            }
         }
 
+        EndpointWatcher.Release(collection);
+        EndpointWatcher.Release(enumerator);
         return result;
     }
 
