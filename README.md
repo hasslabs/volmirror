@@ -106,6 +106,10 @@ Publishes to `%LOCALAPPDATA%\VolMirror`, registers autostart, and launches it.
 Deliberately not run from the repo — `publish\` is gitignored, so a `git clean`
 would delete the executable Windows starts.
 
+Run it from a normal PowerShell window. A shell started from an MSIX-packaged
+app can have its AppData writes redirected into that app's private storage,
+where Windows never autostarts them; the script detects this and stops.
+
 ```powershell
 .\install.ps1 -Uninstall
 ```
