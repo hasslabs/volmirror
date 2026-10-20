@@ -123,4 +123,82 @@ public class ApoConfigTests : IDisposable
 
         Assert.DoesNotContain(Directory.GetFiles(_dir), f => f.Contains("tmp"));
     }
+
+    [Fact]
+    public void PrefixIsExactlyTheIncludeLine_FollowedByTheOriginalBytes()
+    {
+        byte[] original = Encoding.ASCII.GetBytes("Preamp: -3 dB\nFilter 1: OFF\n");
+        File.WriteAllBytes(_configPath, original);
+
+        Assert.True(ApoConfig.EnsureInclude(_configPath));
+
+        byte[] expected = [.. Encoding.ASCII.GetBytes("Include: volume.txt\r\n"), .. original];
+        Assert.Equal(expected, File.ReadAllBytes(_configPath));
+    }
+
+    [Fact]
+    public void SecondCall_IsANoOp()
+    {
+        File.WriteAllText(_configPath, "Preamp: -3 dB\r\n");
+
+        Assert.True(ApoConfig.EnsureInclude(_configPath));
+        byte[] afterFirst = File.ReadAllBytes(_configPath);
+
+        Assert.False(ApoConfig.EnsureInclude(_configPath));
+        Assert.Equal(afterFirst, File.ReadAllBytes(_configPath));
+    }
+
+    [Fact]
+    public void BomOnlyFile_KeepsTheBomFirst()
+    {
+        File.WriteAllBytes(_configPath, [0xEF, 0xBB, 0xBF]);
+
+        ApoConfig.EnsureInclude(_configPath);
+
+        byte[] expected = [0xEF, 0xBB, 0xBF, .. Encoding.ASCII.GetBytes("Include: volume.txt\r\n")];
+        Assert.Equal(expected, File.ReadAllBytes(_configPath));
+    }
+
+    [Fact]
+    public void IncludeFurtherDown_CountsAsPresent()
+    {
+        // Any line matches, not only line 1 - a config that already has the
+        // Include anywhere is left alone.
+        File.WriteAllText(_configPath, "Preamp: -3 dB\nFilter 1: OFF\nInclude: volume.txt\n");
+
+        Assert.False(ApoConfig.EnsureInclude(_configPath));
+    }
+
+    [Theory]
+    [InlineData("Include: other.txt")]
+    [InlineData("Include: volume.txt.bak")]
+    [InlineData("# Include: volume.txt")]
+    [InlineData("Include volume.txt")]
+    public void LookalikeLines_DoNotCountAsPresent(string line)
+    {
+        // A commented-out or different include would leave the preamp unapplied.
+        File.WriteAllText(_configPath, line + "\r\n");
+
+        Assert.True(ApoConfig.EnsureInclude(_configPath));
+        Assert.Equal("Include: volume.txt", File.ReadAllLines(_configPath)[0]);
+    }
+
+    [Fact]
+    public void ReadOnlyConfig_ThrowsAndLeavesTheFileAndNoTempBehind()
+    {
+        const string original = "Preamp: -3 dB\r\n";
+        File.WriteAllText(_configPath, original);
+        File.SetAttributes(_configPath, FileAttributes.ReadOnly);
+        try
+        {
+            Assert.ThrowsAny<UnauthorizedAccessException>(() => ApoConfig.EnsureInclude(_configPath));
+
+            Assert.Equal(original, File.ReadAllText(_configPath));
+            Assert.Equal(new[] { "config.txt" }, Directory.GetFiles(_dir).Select(Path.GetFileName));
+        }
+        finally
+        {
+            File.SetAttributes(_configPath, FileAttributes.Normal);
+        }
+    }
 }
