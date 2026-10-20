@@ -100,4 +100,62 @@ public class PreampMapperTests
             CultureInfo.CurrentCulture = original;
         }
     }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(0.0)]
+    [InlineData(-1.0)]
+    [InlineData(double.NegativeInfinity)]
+    public void ScalarToDb_SilentInputs_ReturnSilence(double scalar)
+    {
+        Assert.Equal(PreampMapper.SilenceDb, PreampMapper.ScalarToDb(scalar));
+    }
+
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(2.0)]
+    [InlineData(double.PositiveInfinity)]
+    public void ScalarToDb_FullOrAbove_IsZero(double scalar)
+    {
+        Assert.Equal(0.0, PreampMapper.ScalarToDb(scalar), precision: 9);
+    }
+
+    [Fact]
+    public void ScalarToDb_IsLinearInTheSliderPosition()
+    {
+        Assert.Equal(-15.0, PreampMapper.ScalarToDb(0.75), precision: 9);
+        Assert.Equal(-54.0, PreampMapper.ScalarToDb(0.10), precision: 9);
+        Assert.Equal(-10.0, PreampMapper.ScalarToDb(0.5, minDb: -20.0), precision: 9);
+    }
+
+    [Fact]
+    public void TinyNonZeroScalar_IsNearMinDb_NotSilence()
+    {
+        // Only exactly zero is silence; the first step above it sits at minDb.
+        Assert.Equal("Preamp: -59.9 dB", PreampMapper.ToPreampLine(0.001, muted: false));
+    }
+
+    [Fact]
+    public void MinDbBelowSilence_IsClampedInTheLine()
+    {
+        // ScalarToDb itself does not clamp, but the line never goes below SilenceDb.
+        Assert.Equal(-135.0, PreampMapper.ScalarToDb(0.1, minDb: -150.0), precision: 9);
+        Assert.Equal("Preamp: -100.0 dB", PreampMapper.ToPreampLine(0.1, muted: false, minDb: -150.0));
+    }
+
+    [Fact]
+    public void PositiveMinDb_NeverBoosts()
+    {
+        // A misconfigured positive minDb would amplify; the line caps gain at 0 dB.
+        Assert.Equal("Preamp: 0.0 dB", PreampMapper.ToPreampLine(0.5, muted: false, minDb: 20.0));
+    }
+
+    [Fact]
+    public void FloatSliderValues_FromCoreAudio_FormatToOneDecimal()
+    {
+        // EndpointWatcher hands over a float widened to double, which is never an
+        // exact decimal; the line must still round cleanly.
+        Assert.Equal("Preamp: -48.0 dB", PreampMapper.ToPreampLine(0.2f, muted: false));
+        Assert.Equal("Preamp: -1.2 dB", PreampMapper.ToPreampLine(0.98f, muted: false));
+    }
 }

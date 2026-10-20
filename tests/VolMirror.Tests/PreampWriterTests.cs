@@ -111,4 +111,27 @@ public class PreampWriterTests : IDisposable
         Assert.True(writer.Write("Preamp: -20.0 dB"));
         Assert.Equal("Preamp: -20.0 dB", File.ReadAllText(_path).Trim());
     }
+
+    [Fact]
+    public void FileIsUtf8WithoutBom_AndEndsWithANewline()
+    {
+        // A BOM would be read by Equalizer APO as part of the "Preamp" key.
+        var writer = new PreampWriter(_path);
+        writer.Write("Preamp: -10.0 dB");
+
+        byte[] expected = System.Text.Encoding.ASCII.GetBytes("Preamp: -10.0 dB" + Environment.NewLine);
+        Assert.Equal(expected, File.ReadAllBytes(_path));
+    }
+
+    [Fact]
+    public void MissingDirectory_ThrowsAfterRetrying_AndKeepsNothingCached()
+    {
+        string missing = Path.Combine(_dir, "gone", "volume.txt");
+        var writer = new PreampWriter(missing);
+
+        Assert.ThrowsAny<IOException>(() => writer.Write("Preamp: -10.0 dB"));
+
+        Directory.CreateDirectory(Path.GetDirectoryName(missing)!);
+        Assert.True(writer.Write("Preamp: -10.0 dB"));
+    }
 }
