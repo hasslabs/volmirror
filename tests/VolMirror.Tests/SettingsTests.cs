@@ -96,4 +96,94 @@ public class SettingsTests : IDisposable
 
         Assert.Null(Settings.Load(_path).PinnedDeviceId);
     }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(12.0)]
+    public void NonNegativeMinDb_FallsBackToTheDefault(double value)
+    {
+        // A MinDb of 0 would make the whole slider 0 dB (no attenuation at all),
+        // and a positive one would boost; both are reset rather than clamped.
+        File.WriteAllText(_path, "{ \"MinDb\": " + value.ToString(System.Globalization.CultureInfo.InvariantCulture) + " }");
+
+        Assert.Equal(PreampMapper.DefaultMinDb, Settings.Load(_path).MinDb);
+    }
+
+    [Theory]
+    [InlineData(-3.0, -6.0)]      // too narrow: clamped to the -6 dB ceiling
+    [InlineData(-250.0, -100.0)]  // wider than silence: clamped to SilenceDb
+    [InlineData(-40.0, -40.0)]    // in range: kept as written
+    public void MinDb_IsClampedIntoTheUsableRange(double written, double expected)
+    {
+        File.WriteAllText(_path, "{ \"MinDb\": " + written.ToString(System.Globalization.CultureInfo.InvariantCulture) + " }");
+
+        Assert.Equal(expected, Settings.Load(_path).MinDb);
+    }
+
+    [Fact]
+    public void WhitespaceStrings_FallBackToDefaults()
+    {
+        File.WriteAllText(_path, "{ \"ConfigDir\": \"  \", \"DeviceNameContains\": \"\t\" }");
+
+        var settings = Settings.Load(_path);
+
+        Assert.Equal(Settings.DefaultConfigDir, settings.ConfigDir);
+        Assert.Equal(Settings.DefaultDeviceName, settings.DeviceNameContains);
+    }
+
+    [Fact]
+    public void JsonNullLiteral_FallsBackToDefaults()
+    {
+        // Deserialize returns null for a bare "null" document.
+        File.WriteAllText(_path, "null");
+
+        var settings = Settings.Load(_path);
+
+        Assert.Equal(Settings.DefaultDeviceName, settings.DeviceNameContains);
+        Assert.Equal(Settings.DefaultPollIntervalMs, settings.PollIntervalMs);
+    }
+
+    [Fact]
+    public void UnreadablePath_FallsBackToDefaults()
+    {
+        // A directory where the file should be: File.Exists is false, so Load tries
+        // to save defaults there, which throws UnauthorizedAccessException on Windows.
+        Directory.CreateDirectory(_path);
+
+        var settings = Settings.Load(_path);
+
+        Assert.Equal(Settings.DefaultDeviceName, settings.DeviceNameContains);
+        Assert.Equal(Settings.DefaultConfigDir, settings.ConfigDir);
+    }
+
+    [Fact]
+    public void Save_CreatesMissingParentDirectories()
+    {
+        string nested = Path.Combine(_dir, "a", "b", "settings.json");
+
+        new Settings { MinDb = -45.0, PinnedDeviceId = "{x}" }.Save(nested);
+        var read = Settings.Load(nested);
+
+        Assert.Equal(-45.0, read.MinDb);
+        Assert.Equal("{x}", read.PinnedDeviceId);
+    }
+
+    [Fact]
+    public void Load_RepairsInMemory_ButDoesNotRewriteTheFile()
+    {
+        // Normalize fixes the loaded object only; the user's file is left as written.
+        const string json = "{ \"PollIntervalMs\": 0 }";
+        File.WriteAllText(_path, json);
+
+        Assert.Equal(Settings.MinPollIntervalMs, Settings.Load(_path).PollIntervalMs);
+        Assert.Equal(json, File.ReadAllText(_path));
+    }
+
+    [Fact]
+    public void UnknownProperties_AreIgnored()
+    {
+        File.WriteAllText(_path, "{ \"Obsolete\": 1, \"DeviceNameContains\": \"Scarlett\" }");
+
+        Assert.Equal("Scarlett", Settings.Load(_path).DeviceNameContains);
+    }
 }
