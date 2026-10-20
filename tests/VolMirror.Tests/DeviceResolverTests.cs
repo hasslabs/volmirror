@@ -92,12 +92,28 @@ public class DeviceResolverTests
     }
 
     [Fact]
-    public void EmptyName_MatchesTheFirstEndpoint()
+    public void BlankNameInSettings_DoesNotAttachToAnArbitraryDevice()
     {
-        // string.Contains("") is always true. Settings.Normalize replaces a blank
-        // name with the default, which is what keeps this from attaching to an
-        // arbitrary device.
-        Assert.Equal("{0.0.0.00000000}.{aaa}", DeviceResolver.PickBestMatch(Endpoints, "", pinnedId: null));
+        // string.Contains("") is always true, so a blank name reaching PickBestMatch
+        // would grab whichever endpoint enumerates first. The guarantee lives in
+        // Settings.Normalize; this checks the pipeline as the app runs it rather
+        // than pinning what PickBestMatch does with an empty query.
+        string dir = Path.Combine(Path.GetTempPath(), "volmirror-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            string path = Path.Combine(dir, "settings.json");
+            File.WriteAllText(path, """{ "DeviceNameContains": "   " }""");
+            var settings = Settings.Load(path);
+
+            AudioEndpointInfo[] noCodec = Endpoints[1..];
+
+            Assert.Null(DeviceResolver.PickBestMatch(noCodec, settings.DeviceNameContains, settings.PinnedDeviceId));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
     }
 
     [Fact]

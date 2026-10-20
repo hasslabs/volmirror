@@ -57,9 +57,12 @@ public class AutostartTests
     [Fact]
     public void ExtractExecutable_UnquotedPathWithSpaces_StopsAtTheFirstSpace()
     {
-        // Why Quote exists: an unquoted Run value under Program Files is read as
-        // "C:\Program" plus arguments.
+        // Characterization of a known limitation, not a requirement: the parse is
+        // deliberately simple because SetEnabled always writes a quoted path (see
+        // Quote). An unquoted Run value under Program Files is therefore read as
+        // "C:\Program" plus arguments, and PointsAt reports it as not ours.
         Assert.Equal(@"C:\Program", Autostart.ExtractExecutable(@"C:\Program Files\VolMirror.exe"));
+        Assert.False(Autostart.PointsAt(@"C:\Program Files\VolMirror.exe", @"C:\Program Files\VolMirror.exe"));
     }
 
     [Fact]

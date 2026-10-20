@@ -115,11 +115,13 @@ public class PreampWriterTests : IDisposable
     [Fact]
     public void FileIsUtf8WithoutBom_AndEndsWithANewline()
     {
-        // A BOM would be read by Equalizer APO as part of the "Preamp" key.
+        // A BOM would be read by Equalizer APO as part of the "Preamp" key. The
+        // project targets net10.0-windows, so the line ending is pinned to CRLF
+        // explicitly rather than echoing Environment.NewLine back at itself.
         var writer = new PreampWriter(_path);
         writer.Write("Preamp: -10.0 dB");
 
-        byte[] expected = System.Text.Encoding.ASCII.GetBytes("Preamp: -10.0 dB" + Environment.NewLine);
+        byte[] expected = System.Text.Encoding.ASCII.GetBytes("Preamp: -10.0 dB\r\n");
         Assert.Equal(expected, File.ReadAllBytes(_path));
     }
 
