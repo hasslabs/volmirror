@@ -285,14 +285,23 @@ public class TrayAppTests : IDisposable
 
     // ---- quitting ----
 
-    [Fact(Skip = "BUG: TrayApp.RestoreUnityGain writes ToPreampLine(0.0, false), and 0.0 is the bottom "
-               + "of the slider (silence), so Quit/ProcessExit leave 'Preamp: -100.0 dB' instead of "
-               + "unity gain. Unskip once it passes ToPreampLine(1.0, false).")]
+    [Fact]
     public void RestoreUnityGain_LeavesTheOutputAtZeroDb()
     {
         // The Include line stays live after exit and the DAC's own volume is
         // inert, so whatever gain is left in volume.txt is what the user hears.
         VolumeChanged(0.5, muted: true);
+
+        Private.Call(_app, "RestoreUnityGain");
+
+        Assert.Equal("Preamp: 0.0 dB", VolumeFile());
+    }
+
+    [Fact]
+    public void RestoreUnityGain_FromAQuietUnmutedVolume_StillRaisesToZeroDb()
+    {
+        // Not muted, just low: the exit gain must not depend on where the slider was.
+        VolumeChanged(0.1, muted: false);
 
         Private.Call(_app, "RestoreUnityGain");
 

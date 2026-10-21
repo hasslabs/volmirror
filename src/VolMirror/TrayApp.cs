@@ -236,7 +236,8 @@ public sealed class TrayApp : ApplicationContext
         try
         {
             _writer.Invalidate();
-            _writer.Write(PreampMapper.ToPreampLine(0.0, muted: false));
+            // Scalar 1.0 is the top of the slider, i.e. 0 dB; 0.0 would be silence.
+            _writer.Write(PreampMapper.ToPreampLine(1.0, muted: false));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
